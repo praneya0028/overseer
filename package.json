@@ -1,0 +1,39 @@
+{
+  "name": "overseer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Overseer \u2014 mission-control head-agent console for a fleet of cmux Claude Code agents (local-only personal tool)",
+  "scripts": {
+    "dev": "concurrently -k -n vite,server -c cyan,magenta \"vite\" \"tsx watch src/server/index.ts\"",
+    "build": "vite build && tsc -p tsconfig.server.json",
+    "start": "node dist/server/index.js",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "test": "node test/scrollback.test.mjs"
+  },
+  "dependencies": {
+    "@fontsource/chivo": "^5.0.20",
+    "@fontsource/ibm-plex-mono": "^5.0.13",
+    "@fontsource/press-start-2p": "^5.2.7",
+    "@fontsource/silkscreen": "^5.2.8",
+    "@fontsource/vt323": "^5.2.7",
+    "framer-motion": "^11.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "ws": "^8.18.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@types/ws": "^8.5.10",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "postcss": "^8.4.39",
+    "tailwindcss": "^3.4.6",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.3",
+    "vite": "^5.3.4"
+  }
+}
