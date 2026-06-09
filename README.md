@@ -173,8 +173,9 @@ You see it live in the **Autopilot Log**, and it's appended to `.overseer/decisi
 gitignored). Hold-to-confirm **Recall All** drops the master toggle *and* every per-agent toggle and
 aborts anything in flight — full stop, one gesture.
 
-> Try it risk-free: set `OVERSEER_SHADOW=1` and autopilot will **decide and log** what it *would* do
-> on every stall, but never actually send. Watch it reason for a day before you arm it.
+> Try it send-free: set `OVERSEER_SHADOW=1` and autopilot will **decide and log** what it *would* do
+> on every stall — without arming anything — but never actually send. The shadow decisions are real
+> brain calls (normal Claude usage); watch it reason for a day before you arm it.
 
 ---
 

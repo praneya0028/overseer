@@ -174,9 +174,10 @@ All verified live against cmux 0.64.x. **These are the load-bearing gotchas:**
   so you never open to an empty "No agents yet". A live-but-unlinked daemon gets a
   ~5s self-heal grace before any restart (cmux re-resolves its socket each reconnect).
 - **One daemon, always:** launched **without a subshell** (a `( … )` wrapper broke the
-  cmux socket connection) and by **absolute path** (so `pkill`/ownership patterns
-  match). A duplicate hits `EADDRINUSE` → exits 0; `stop` blocks until the port frees
-  (SIGTERM→SIGKILL) and only ever signals a pid confirmed to be our own daemon.
+  cmux socket connection) and by **absolute path** (so process-ownership patterns
+  match). A duplicate hits `EADDRINUSE` → exits 0; the internal restart path blocks
+  until the port frees before relaunching, and the launcher only ever signals a pid
+  confirmed to be our own daemon.
 - **No tile flicker:** detection is *sticky* (a known agent + its type stay while its
   surface exists) + an 8s grace before removal; read blips never drop a tile.
 - **Bounded polling / no infinite fetch:** single-flight per surface, a read budget
@@ -220,12 +221,13 @@ hotkey, deferred if the index is multi-digit). The whole gauntlet is vendor-neut
 it guards Gemini exactly as it guards Claude.
 
 **What makes the brain answer like the human** (not a generic LLM): standing
-orders (`orders.ts` — global persisted to `.overseer/orders.json`, per-agent
-session-scoped, both editable from the UI's ✎ orders buttons and treated as
-overriding instructions in the prompt), session history (the Fleet's scrollback —
+orders (`orders.ts` — global and per-agent, both persisted to `.overseer/orders.json`;
+per-agent entries are pruned when their surface leaves the fleet; both editable from
+the UI's ✎ orders buttons and treated as overriding instructions in the prompt), session history (the Fleet's scrollback —
 the brain infers the task before judging the question), and precedent
-(`decisionlog.precedents` — the human's own `manual_answer`s rank first,
-same-cwd first, so repeated answers become the brain's style).
+(`decisionlog.precedents` — same-project answers rank first, newest first, and each
+is labeled for the brain as the human's own answer vs an accepted autopilot send,
+so repeated answers become the brain's style).
 
 ---
 
