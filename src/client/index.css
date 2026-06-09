@@ -1,0 +1,295 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================================
+   RETRO THEME — 90s SNES-menu / Animal-Crossing vibe. Two palettes, swapped via
+   <html data-theme="light|dark">. All component colors come from these vars.
+   ============================================================================ */
+
+:root,
+:root[data-theme='light'] {
+  --void: #e9dec1; /* page background — warm parchment */
+  --panel: #fcf7ea; /* cards / panels — cream */
+  --panel-2: #f1e6c9; /* raised */
+  --hairline: #d8c79c;
+  --outline: #3a2e1f; /* chunky panel border (dark brown) */
+  --shadow: rgba(58, 46, 31, 0.5); /* hard drop shadow */
+  --ink: #34281a; /* primary text */
+  --ink-dim: #6b5a42;
+  --ink-mute: #9c8a6a;
+  --grid: rgba(58, 46, 31, 0.05);
+  /* lifecycle */
+  --idle: #9c8a6a;
+  --working: #2f9e6e;
+  --waiting: #d9851f;
+  --needs: #d6453f;
+  --error: #c0392b;
+  --done: #2f7fd1;
+  /* autopilot (purple — never collides with lifecycle) */
+  --ap: #7a4fd0;
+  --recall: #c0392b;
+  --term-bg: #f7f0dc; /* terminal viewport bg (light) */
+  --term-ink: #4a3c28;
+}
+
+:root[data-theme='dark'] {
+  --void: #181426; /* deep warm indigo (not pure black) */
+  --panel: #272136;
+  --panel-2: #322a45;
+  --hairline: #463c5e;
+  --outline: #0e0a1a;
+  --shadow: rgba(6, 4, 14, 0.7);
+  --ink: #f4eeda; /* warm cream text */
+  --ink-dim: #cabfe6;
+  --ink-mute: #8a7fae;
+  --grid: rgba(255, 255, 255, 0.035);
+  --idle: #6e6a8c;
+  --working: #5fd38f;
+  --waiting: #ffce54;
+  --needs: #ff6b6b;
+  --error: #ff5252;
+  --done: #5fb8ff;
+  --ap: #b98cff;
+  --recall: #ff6b6b;
+  --term-bg: #120e20;
+  --term-ink: #cfe8d6;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+body {
+  background-color: var(--void);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 22px 22px; /* faint grid in both themes */
+  color: var(--ink);
+  /* Readable everywhere — the retro feel comes from the chunky panels, colors,
+     avatars and a pixel WORDMARK, not from pixelating the body text. */
+  font-family: 'Chivo', ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* typography helpers */
+.font-pixel {
+  font-family: 'Press Start 2P', monospace;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+.mono {
+  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+}
+.smallcaps {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ui {
+  font-family: 'Chivo', ui-sans-serif, system-ui, sans-serif;
+}
+/* avatars stay crisp-pixel; text does not */
+svg {
+  image-rendering: auto;
+}
+
+/* ---- chunky SNES-menu surfaces ---- */
+.pixel-panel {
+  background: var(--panel);
+  border: 2px solid var(--outline);
+  box-shadow: 4px 4px 0 0 var(--shadow);
+  border-radius: 6px;
+}
+.pixel-inset {
+  background: var(--term-bg);
+  border: 2px solid var(--outline);
+  border-radius: 5px;
+}
+.pixel-btn {
+  font-family: 'Chivo', ui-sans-serif, system-ui, sans-serif;
+  font-weight: 700;
+  background: var(--panel-2);
+  border: 2px solid var(--outline);
+  box-shadow: 2px 2px 0 0 var(--shadow);
+  border-radius: 4px;
+  color: var(--ink);
+  transition:
+    transform 0.08s ease,
+    box-shadow 0.08s ease,
+    filter 0.12s ease;
+}
+.pixel-btn:hover {
+  filter: brightness(1.06);
+}
+.pixel-btn:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 0 var(--shadow);
+}
+
+/* scrollbars */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--hairline);
+  border: 2px solid var(--void);
+}
+
+/* ============================================================================
+   ANIMATIONS (GPU-only). Class names kept stable for existing components.
+   ============================================================================ */
+@keyframes breathe {
+  from {
+    box-shadow: 0 0 0 0 transparent;
+    opacity: 0.6;
+  }
+  to {
+    box-shadow: 0 0 10px 0 var(--working);
+    opacity: 1;
+  }
+}
+@keyframes pulse-amber {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}
+@keyframes pulse-rose {
+  0%, 100% { box-shadow: 0 0 0 0 transparent; }
+  50% { box-shadow: 0 0 12px 0 var(--needs); }
+}
+@keyframes shimmer-ap {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes scanline {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(1400%); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-3px); }
+  40% { transform: translateX(3px); }
+  60% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes spin-slow { to { transform: rotate(360deg); } }
+@keyframes tick-pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.45); }
+  100% { transform: scale(1); }
+}
+@keyframes reactor-sweep { to { transform: rotate(360deg); } }
+@keyframes wordmark-glow {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.12); }
+}
+@keyframes chip-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+.anim-breathe { animation: breathe 2s ease-in-out infinite alternate; }
+.anim-pulse-amber { animation: pulse-amber 1.4s ease-in-out infinite; }
+.anim-pulse-rose { animation: pulse-rose 1s ease-in-out infinite; }
+.anim-shimmer-ap { animation: shimmer-ap 2.6s ease-in-out infinite; }
+.anim-spin-slow { animation: spin-slow 3.5s linear infinite; }
+.anim-shake { animation: shake 0.32s ease-in-out; }
+.anim-tick { animation: tick-pop 0.42s ease-out; }
+.anim-reactor { animation: reactor-sweep 3s linear infinite; }
+.anim-wordmark { animation: wordmark-glow 2.4s ease-in-out infinite; }
+.anim-chip { animation: chip-pulse 1.2s ease-in-out infinite; }
+.anim-bob { animation: bob 2.4s ease-in-out infinite; }
+
+.scanline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 16px;
+  background: linear-gradient(180deg, transparent, rgba(120, 200, 160, 0.12), transparent);
+  animation: scanline 8s linear infinite;
+  pointer-events: none;
+}
+
+/* ---- atmosphere (subtle, themed; replaces the deep-space starfield) ---- */
+.atmos-stars,
+.atmos-stars.layer2 {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image: radial-gradient(circle at 50% 50%, var(--grid) 0, transparent 1.5px);
+  background-size: 28px 28px;
+  opacity: 0.5;
+}
+.atmos-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background: radial-gradient(135% 100% at 50% 38%, transparent 58%, var(--shadow) 135%);
+  opacity: 0.45;
+}
+.atmos-scan {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 120px;
+  pointer-events: none;
+  z-index: 2;
+  background: linear-gradient(180deg, transparent, rgba(120, 200, 160, 0.04), transparent);
+  animation: scanline 16s linear infinite;
+}
+.atmos-master-grid {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.6s ease;
+  background-image:
+    linear-gradient(var(--ap) 1px, transparent 1px),
+    linear-gradient(90deg, var(--ap) 1px, transparent 1px);
+  background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 50%, rgba(0, 0, 0, 0.16), transparent 75%);
+  mask-image: radial-gradient(120% 90% at 50% 50%, rgba(0, 0, 0, 0.16), transparent 75%);
+}
+.atmos-master-grid.on {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anim-breathe,
+  .anim-pulse-amber,
+  .anim-pulse-rose,
+  .anim-shimmer-ap,
+  .anim-spin-slow,
+  .anim-tick,
+  .anim-reactor,
+  .anim-wordmark,
+  .anim-chip,
+  .anim-bob,
+  .scanline,
+  .atmos-scan {
+    animation: none !important;
+  }
+}
