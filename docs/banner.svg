@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="240" viewBox="0 0 900 240" fill="none" role="img" aria-label="Overseer — Control Center for your AI agent fleet">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0e1620"/>
+      <stop offset="100%" stop-color="#181426"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#22d3ee" stroke-opacity="0.06"/>
+    </pattern>
+  </defs>
+
+  <rect width="900" height="240" rx="14" fill="url(#bg)"/>
+  <rect width="900" height="240" rx="14" fill="url(#grid)"/>
+
+  <!-- left: animated control-hub emblem -->
+  <g transform="translate(130 120)">
+    <circle r="92" fill="url(#glow)">
+      <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4s" repeatCount="indefinite"/>
+    </circle>
+    <!-- outer orbit -->
+    <ellipse rx="78" ry="40" fill="none" stroke="#22d3ee" stroke-opacity="0.55" stroke-width="2"/>
+    <!-- inner tilted orbit -->
+    <g transform="rotate(34)">
+      <ellipse rx="40" ry="78" fill="none" stroke="#2dd4bf" stroke-opacity="0.45" stroke-width="2"/>
+    </g>
+    <!-- core -->
+    <circle r="20" fill="#22d3ee"/>
+    <circle r="20" fill="none" stroke="#0e1620" stroke-width="3"/>
+    <!-- traveling pilots on the outer orbit -->
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="0" to="360" dur="9s" repeatCount="indefinite"/>
+      <circle cx="78" cy="0" r="7" fill="#f5b83d" stroke="#0e1620" stroke-width="2"/>
+    </g>
+    <g>
+      <animateTransform attributeName="transform" type="rotate" from="180" to="540" dur="9s" repeatCount="indefinite"/>
+      <circle cx="78" cy="0" r="6" fill="#5fd38f" stroke="#0e1620" stroke-width="2"/>
+    </g>
+    <!-- pilot on inner orbit -->
+    <g transform="rotate(34)">
+      <g>
+        <animateTransform attributeName="transform" type="rotate" from="0" to="-360" dur="6s" repeatCount="indefinite"/>
+        <circle cx="0" cy="78" r="6" fill="#b98cff" stroke="#0e1620" stroke-width="2"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- right: wordmark -->
+  <g transform="translate(280 0)">
+    <text x="0" y="98" font-family="'Chivo','Segoe UI',Helvetica,Arial,sans-serif" font-size="62" font-weight="900" fill="#f4eeda" letter-spacing="6">OVERSEER</text>
+    <rect x="2" y="118" width="46" height="4" rx="2" fill="#22d3ee"/>
+    <text x="58" y="124" font-family="'Chivo','Segoe UI',Helvetica,Arial,sans-serif" font-size="15" font-weight="700" fill="#8a7fae" letter-spacing="6">CONTROL CENTER</text>
+    <text x="2" y="162" font-family="'Chivo','Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#cabfe6">One screen to watch, command &amp; auto-pilot</text>
+    <text x="2" y="188" font-family="'Chivo','Segoe UI',Helvetica,Arial,sans-serif" font-size="19" fill="#cabfe6">your whole fleet of AI coding agents.</text>
+  </g>
+</svg>
