@@ -110,7 +110,16 @@ const MIME: Record<string, string> = {
 };
 
 async function serveStatic(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
-  const urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+  // decodeURIComponent throws on malformed escapes (e.g. "/%zz") — treat those
+  // as a plain 404 instead of letting the request handler reject.
+  let urlPath: string;
+  try {
+    urlPath = decodeURIComponent((req.url || '/').split('?')[0]);
+  } catch {
+    res.writeHead(404, { 'content-type': 'text/plain' });
+    res.end('not found');
+    return;
+  }
   let rel = normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
   if (rel === '/' || rel === '') rel = '/index.html';
   let filePath = join(CLIENT_DIR, rel);
@@ -173,6 +182,20 @@ function readBody(req: http.IncomingMessage): Promise<any> {
 
 // ---- HTTP server ----
 const server = http.createServer(async (req, res) => {
+  try {
+    await handleRequest(req, res);
+  } catch (e) {
+    // A request must never take the daemon down. Answer 500 if we still can.
+    try {
+      if (!res.headersSent) res.writeHead(500, { 'content-type': 'text/plain' });
+      res.end('internal error');
+    } catch {
+      /* socket already gone */
+    }
+  }
+});
+
+async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
   const url = (req.url || '/').split('?')[0];
 
   if (url === '/health') {
@@ -231,7 +254,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   await serveStatic(req, res);
-});
+}
 
 // ---- WebSocket ----
 const wss = new WebSocketServer({
@@ -270,6 +293,14 @@ wss.on('connection', (ws) => {
     } catch {
       return;
     }
+    try {
+      await handleClientMessage(ws, msg);
+    } catch {
+      /* a malformed message must never take the daemon down */
+    }
+  });
+
+  async function handleClientMessage(ws: WebSocket, msg: ClientMessage): Promise<void> {
     switch (msg.type) {
       case 'subscribe': {
         fleet.setView(msg.visibleIds, msg.expandedId);
@@ -334,7 +365,7 @@ wss.on('connection', (ws) => {
         break;
       case 'setOrders':
         // Standing orders for the brain — global (surfaceId null) or per-agent.
-        setOrders(msg.surfaceId, msg.text);
+        setOrders(msg.surfaceId ?? null, String(msg.text ?? ''));
         broadcast({ type: 'orders', orders: getOrders() });
         break;
       case 'recallAll':
@@ -343,7 +374,7 @@ wss.on('connection', (ws) => {
         broadcast({ type: 'toast', level: 'info', text: 'Fleet recalled — autopilot disarmed everywhere' });
         break;
     }
-  });
+  }
 
   ws.on('close', () => clients.delete(ws));
   ws.on('error', () => clients.delete(ws));
