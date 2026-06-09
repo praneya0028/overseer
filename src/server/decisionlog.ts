@@ -58,7 +58,9 @@ export class DecisionLog {
     });
     const same = this.ring.filter((d) => pick(d) && cwd && d.cwd === cwd);
     const rest = this.ring.filter((d) => pick(d) && !(cwd && d.cwd === cwd));
-    return [...same, ...rest].slice(0, limit).map(toEntry).filter((e) => e.answer);
+    // Map+filter BEFORE slicing — an empty-answer record must not eat a slot
+    // while a usable precedent sits just past the cut.
+    return [...same, ...rest].map(toEntry).filter((e) => e.answer).slice(0, limit);
   }
 
   getCostToday(): number {
