@@ -69,9 +69,9 @@ arbitrary, independently-launched, mixed-vendor agent's own question — the way
 
 An agent has **two** kinds of stop, and auto modes only touch one: **(A)** a tool-approval pause —
 `auto` / `--yolo` modes widen what runs without asking; and **(B)** the agent **deciding to ask you a
-question**. No mode suppresses (B), and no mode auto-answers the agent's own question — so even in
-full auto, an agent parks itself the instant it asks. That's the gap, and it's the whole game across
-a fleet.
+question**. A mode can nudge an agent to ask less (Claude's auto mode does exactly that) — but when
+the agent *does* ask, no mode answers the question for it. It parks itself until a human replies.
+That's the gap, and it's the whole game across a fleet.
 
 | When an agent… | Your auto mode | **Overseer autopilot** |
 |---|---|---|
@@ -87,7 +87,7 @@ pauses across the whole fleet, and the risky calls always come back to you.
 > **An honest boundary.** The brain is for **ambiguous decisions a pre-approval rule can never
 > pre-answer** — and it never invents new work for a *finished* agent; that's yours, in **Needs You**.
 
-<sub>Sources: Claude Code [permission modes](https://code.claude.com/docs/en/permission-modes) &amp; [Agent View](https://code.claude.com/docs/en/agent-view) (a session reports `waitingFor: "permission prompt"` **or** `"input needed"`); [auto-mode deep-dive](https://www.anthropic.com/engineering/claude-code-auto-mode); Gemini CLI ships an [`ask_user`](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/ask-user.md) tool that pauses regardless of `--yolo`; Codex asks clarifying questions as plain prose ([no interactive prompt UI shipped](https://github.com/openai/codex/issues/23623)).</sub>
+<sub>Sources: Claude Code [permission modes](https://code.claude.com/docs/en/permission-modes) &amp; [Agent View](https://code.claude.com/docs/en/agent-view) (a session reports `waitingFor: "permission prompt"` **or** `"input needed"`); [auto-mode deep-dive](https://www.anthropic.com/engineering/claude-code-auto-mode); Gemini CLI ships an [`ask_user`](https://github.com/google-gemini/gemini-cli/blob/main/docs/tools/ask-user.md) tool that "pauses execution until the user provides answers"; Codex asks clarifying questions as plain prose ([no interactive prompt UI shipped](https://github.com/openai/codex/issues/23623)).</sub>
 
 ---
 
