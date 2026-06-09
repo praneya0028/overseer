@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { ClientMessage, ServerMessage } from '../shared/contract';
-import { useStore } from './store';
+import { useStore, resubscribe } from './store';
 
 let socket: WebSocket | null = null;
 let backoff = 500;
@@ -14,6 +14,7 @@ let backoff = 500;
 // a tight reconnect costs nothing.
 const MAX_BACKOFF = 3_000;
 const queue: ClientMessage[] = [];
+const QUEUE_MAX = 100; // offline actions are user-driven; bound it regardless
 
 function flush(): void {
   if (socket && socket.readyState === WebSocket.OPEN) {
@@ -23,7 +24,10 @@ function flush(): void {
 
 function wsSend(m: ClientMessage): void {
   if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(m));
-  else queue.push(m); // sent on (re)connect
+  else {
+    queue.push(m); // sent on (re)connect
+    if (queue.length > QUEUE_MAX) queue.shift();
+  }
 }
 
 export function connectWs(): void {
@@ -36,6 +40,9 @@ export function connectWs(): void {
     backoff = 500;
     useStore.getState().setConnected(true);
     flush();
+    // Re-announce the current view: a restarted daemon has empty view state, and
+    // without this an already-expanded terminal would never resume its stream.
+    resubscribe();
   };
   ws.onmessage = (ev) => {
     try {

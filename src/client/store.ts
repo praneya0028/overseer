@@ -196,3 +196,9 @@ export function reportVisible(id: string, visible: boolean): void {
 function pushSubscribe(get: () => State): void {
   get()._send({ type: 'subscribe', visibleIds: [...visibleIds], expandedId: get().expandedId });
 }
+
+/** Re-send the current view state (ws.ts calls this on every (re)connect — a
+ *  restarted daemon starts with no view state and needs it re-announced). */
+export function resubscribe(): void {
+  pushSubscribe(() => useStore.getState());
+}

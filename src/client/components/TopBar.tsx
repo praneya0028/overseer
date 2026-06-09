@@ -311,6 +311,7 @@ export function TopBar() {
           startHold();
         }}
         onTouchEnd={stopHold}
+        onTouchCancel={stopHold}
         className="pixel-btn ui relative shrink-0 overflow-hidden whitespace-nowrap px-3 py-1.5 text-[12px] font-bold"
         style={{ borderColor: recallProgress > 0 ? 'var(--recall)' : undefined }}
         title="Press and hold to recall the whole fleet from autopilot"
