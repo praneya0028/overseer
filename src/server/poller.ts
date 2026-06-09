@@ -11,7 +11,7 @@ import { Agent } from '../shared/contract';
 import { IFleet } from './types';
 import * as cmux from './cmux';
 import { RawSurface } from './cmux';
-import { deriveState, detectAgent, splitGlyph, screenHash, stripComposerBox, AgentKind } from './state';
+import { deriveState, detectAgent, detectAgentByPid, splitGlyph, screenHash, stripComposerBox, AgentKind } from './state';
 
 // Over the persistent socket cmux handles bursts fine, so poll responsively.
 // A read budget still bounds per-tick work for very large fleets.
@@ -291,14 +291,20 @@ export class Fleet extends EventEmitter implements IFleet {
             // "self" silently hid a real agent (the #1 "No agents yet" complaint).
             // The Overseer UI is a browser pane, already filtered by type above.
             const prevText = this.meta.get(s.id)?.fullText;
-            // STICKY first: once a surface is a known agent, its already-resolved
-            // kind WINS — cmux's PID set fluctuates tick to tick, and detectAgent's
-            // Claude glyph/chrome fallback could otherwise re-tag a known codex/gemini
-            // surface as 'claude' on a PID-miss tick (then route it through the Claude
-            // waiting-parser). Pinning the prior kind keeps the type — and which
-            // adapter parses it — stable for the surface's lifetime.
+            // Kind resolution, strongest signal first:
+            //   1. PID match via the foreground (tty) process group — a terminal can
+            //      hold SEVERAL agent kinds (a suspended codex behind a live Claude),
+            //      and the foreground process is the one the human is talking to.
+            //      This also lets a surface re-tag correctly when the user switches
+            //      vendors in the same tab.
+            //   2. STICKY previous kind — cmux's PID set fluctuates tick to tick, so
+            //      on a PID-miss tick the already-resolved kind holds (no flapping,
+            //      and the glyph/chrome fallback can't re-tag a known codex/gemini
+            //      surface as 'claude').
+            //   3. Full detection incl. the Claude glyph/chrome fallback (new agents).
             const prevA = this.agents.get(s.id);
-            let kind: AgentKind | null = prevA ? { id: prevA.agentType, label: prevA.agentLabel } : null;
+            let kind: AgentKind | null = detectAgentByPid(s, agentByPid);
+            if (!kind && prevA) kind = { id: prevA.agentType, label: prevA.agentLabel };
             if (!kind) kind = detectAgent(s, prevText, agentByPid);
             if (!kind && this.testAgents.has(s.id)) kind = { id: 'claude', label: 'Claude Code' };
             if (!kind) continue;

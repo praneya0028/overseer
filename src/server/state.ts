@@ -94,6 +94,27 @@ export interface AgentKind {
   label: string; // human label (cmux display_name), e.g. 'Claude Code'
 }
 
+/** PID-based detection ONLY (the strong signal). Foreground first: a terminal
+ *  can hold processes of SEVERAL agent kinds (e.g. a suspended codex behind a
+ *  running Claude session), and the tty process group is what the human is
+ *  actually talking to — so it decides the kind. Background/root pids are the
+ *  fallback for the tick where the tty set lags. Returns null on no match. */
+export function detectAgentByPid(
+  surface: RawSurface,
+  agentByPid: Map<number, AgentKind>,
+): AgentKind | null {
+  if (surface.type !== 'terminal') return null;
+  for (const p of surface.tty_process_pids || []) {
+    const kind = agentByPid.get(p);
+    if (kind) return kind;
+  }
+  for (const p of [...(surface.resources?.pids || []), ...(surface.root_pids || [])]) {
+    const kind = agentByPid.get(p);
+    if (kind) return kind;
+  }
+  return null;
+}
+
 /** Detect whether this surface is a controllable coding agent, and of WHAT kind.
  *  Agent-agnostic: cmux's `coding_agents` registry tags running agents by type
  *  (claude / codex / generic / …), so a PID intersection both detects the agent
@@ -105,18 +126,10 @@ export function detectAgent(
   agentByPid: Map<number, AgentKind>,
 ): AgentKind | null {
   if (surface.type !== 'terminal') return null;
-  // 1. PID intersection with the coding-agent pid map (most robust + types it).
-  const pids: number[] = [
-    ...(surface.resources?.pids || []),
-    ...(surface.root_pids || []),
-    ...(surface.tty_process_pids || []),
-  ];
-  for (const p of pids) {
-    const kind = agentByPid.get(p);
-    if (kind) return kind;
-  }
-  // 2 + 3. Claude-only fallbacks (glyph / chrome) — keep Claude robust even if
-  // its pid set momentarily lags. Other agents are detected via the pid map only.
+  const byPid = detectAgentByPid(surface, agentByPid);
+  if (byPid) return byPid;
+  // Claude-only fallbacks (glyph / chrome) — keep Claude robust even if its pid
+  // set momentarily lags. Other agents are detected via the pid map only.
   if (CLAUDE_GLYPH.test(surface.title || '')) return { id: 'claude', label: 'Claude Code' };
   if (viewport && (CHROME.AUTO_MODE.test(viewport) || CHROME.STATUS_FOOTER.test(viewport)))
     return { id: 'claude', label: 'Claude Code' };
