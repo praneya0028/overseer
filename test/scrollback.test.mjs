@@ -52,5 +52,16 @@ eq('redraw preserves vanished view', m.transcript, [
 ingest(m, '\n\n');
 eq('blank frame ignored', m.liveView, ['totally', 'different', 'screen']);
 
+// 7. overlay round-trip: a full-screen overlay (help / transcript view) opens
+//    and closes; the restored content must NOT re-commit when it scrolls off.
+const m2 = { transcript: [], liveView: [] };
+ingest(m2, 'alpha\nbeta\ngamma');
+ingest(m2, 'beta\ngamma\ndelta');                  // scroll → commits alpha
+ingest(m2, 'OVERLAY HEADER\nmenu item\nfooter');   // overlay → commits beta/gamma/delta
+ingest(m2, 'beta\ngamma\ndelta');                  // overlay closes → un-commits back to the match
+ingest(m2, 'gamma\ndelta\nepsilon');               // restored content scrolls again
+eq('overlay round-trip never duplicates', m2.transcript, ['alpha', 'beta']);
+eq('overlay round-trip live view', m2.liveView, ['gamma', 'delta', 'epsilon']);
+
 console.log(fail === 0 ? `scrollback: ALL ${pass} PASS` : `scrollback: ${fail} FAILURES`);
 process.exit(fail === 0 ? 0 : 1);

@@ -111,11 +111,28 @@ export function ingest(m: { transcript: string[]; liveView: string[] }, text: st
       if (full && span >= 2) break; // perfect alignment — can't beat it
     }
     const aligned = bestLen >= 2 || (bestFull && bestLen >= 1);
+    if (!aligned && V.length >= 2) {
+      // Unaligned, and the NEW view matches a recently committed block: the
+      // screen RETURNED to history — a full-screen overlay (help / transcript
+      // view) just closed and restored what was underneath. Un-commit: truncate
+      // the transcript back to the match and let those lines be live again
+      // (this also drops the overlay's own chrome frame, which is the right
+      // call — it was never conversation). Without this, the restored content
+      // re-commits when it next scrolls off → duplicated history.
+      const at = lastBlockIndex(m.transcript, V, 80);
+      if (at >= 0) {
+        m.transcript.length = at;
+        m.liveView = V;
+        return;
+      }
+    }
     // Aligned: commit the lines that scrolled off the top. Unaligned (redraw /
-    // clear): the old view is gone from screen — commit all of it as history,
-    // unless it's already the transcript tail (idempotent on repeated redraws).
-    const commit = aligned ? P.slice(0, bestS) : P;
-    if (commit.length && !endsWithBlock(m.transcript, commit)) {
+    // clear): the old view is gone from screen — commit it as history. Either
+    // way, trim the prefix that already ends the transcript (idempotent on
+    // repeated identical redraw frames).
+    let commit = aligned ? P.slice(0, bestS) : P;
+    commit = commit.slice(overlapWithTail(m.transcript, commit));
+    if (commit.length) {
       m.transcript.push(...commit);
       if (m.transcript.length > TRANSCRIPT_MAX) m.transcript.splice(0, m.transcript.length - TRANSCRIPT_MAX);
     }
@@ -123,12 +140,38 @@ export function ingest(m: { transcript: string[]; liveView: string[] }, text: st
   m.liveView = V;
 }
 
-// Does T already end with the contiguous block B? (Dedupe guard for redraws.)
-function endsWithBlock(T: string[], B: string[]): boolean {
-  if (B.length > T.length) return false;
-  const off = T.length - B.length;
-  for (let i = 0; i < B.length; i++) if (T[off + i] !== B[i]) return false;
-  return true;
+// Last start index where B appears as a contiguous block in T, provided the
+// match ends within the trailing `window` lines (recent history only). -1 if none.
+function lastBlockIndex(T: string[], B: string[], window: number): number {
+  const minEnd = Math.max(0, T.length - window);
+  for (let i = T.length - B.length; i >= 0; i--) {
+    if (i + B.length < minEnd) break;
+    let ok = true;
+    for (let j = 0; j < B.length; j++) {
+      if (T[i + j] !== B[j]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return i;
+  }
+  return -1;
+}
+
+// Longest k such that T's last k lines equal B's first k lines (suffix-prefix
+// overlap). Used to drop the already-committed head of a commit block.
+function overlapWithTail(T: string[], B: string[]): number {
+  for (let k = Math.min(T.length, B.length); k > 0; k--) {
+    let ok = true;
+    for (let i = 0; i < k; i++) {
+      if (T[T.length - k + i] !== B[i]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) return k;
+  }
+  return 0;
 }
 
 // Full display text for a surface: committed scrollback + the live viewport.
