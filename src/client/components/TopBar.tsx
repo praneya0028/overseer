@@ -268,7 +268,7 @@ export function TopBar() {
                   setBrainOpen(false);
                 }
               }}
-              placeholder="+ custom model id ↩"
+              placeholder="+ any Claude model id ↩"
               title="Type any claude model id (e.g. a dated snapshot) and press Enter to use it as the brain"
               className="mono mt-1 w-full border-t-2 border-[color:var(--hairline)] bg-transparent px-2.5 pt-1.5 text-[11px] text-ink outline-none placeholder:text-ink-mute"
             />
