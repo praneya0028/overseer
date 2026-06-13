@@ -2,13 +2,14 @@
   "name": "overseer",
   "version": "1.0.0",
   "private": true,
+  "license": "MIT",
   "description": "Overseer \u2014 mission-control head-agent console for a fleet of cmux Claude Code agents (local-only personal tool)",
   "scripts": {
     "dev": "concurrently -k -n vite,server -c cyan,magenta \"vite\" \"tsx watch src/server/index.ts\"",
     "build": "vite build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.server.json --noEmit",
-    "test": "node test/scrollback.test.mjs"
+    "test": "node test/scrollback.test.mjs && node test/safety.test.mjs"
   },
   "dependencies": {
     "@fontsource/chivo": "^5.0.20",

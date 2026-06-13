@@ -328,7 +328,7 @@ export function TopBar() {
         />
         <span className="relative inline-flex items-center gap-1.5">
           <span style={{ color: 'var(--recall)' }}>⟲</span>
-          {recallProgress >= 1 ? 'Recalled!' : recallProgress > 0 ? 'Hold…' : 'Recall All'}
+          {recallProgress >= 1 ? (offline ? 'Offline' : 'Recalled!') : recallProgress > 0 ? 'Hold…' : 'Recall All'}
         </span>
       </button>
       )}

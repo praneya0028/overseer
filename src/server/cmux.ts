@@ -83,6 +83,11 @@ function connect(): Promise<net.Socket> {
     s.on('connect', () => {
       sock = s;
       connecting = null;
+      // Start this connection with a clean receive buffer. The old socket's
+      // 'close' normally clears rxBuf, but a destroy()-on-timeout may not emit
+      // 'close' before this new socket goes live; a leftover partial frame would
+      // then corrupt the first frame read here.
+      rxBuf = '';
       // Keepalive: a dead/half-open cmux socket may never emit 'close'. Ping
       // periodically; a failed ping destroys the socket so the next call
       // reconnects fresh — this is what makes the daemon self-heal.
@@ -116,7 +121,10 @@ function connect(): Promise<net.Socket> {
         if (!p) continue;
         pending.delete(msg.id);
         clearTimeout(p.timer);
-        if (msg.ok === false) p.reject(new Error(`cmux error: ${JSON.stringify(msg.error || msg)}`));
+        // Reject on an explicit ok:false OR a standard JSON-RPC `error` member —
+        // a future/standard cmux build that drops the `ok` envelope must not have
+        // an error frame silently resolve as a successful `undefined` result.
+        if (msg.ok === false || msg.error != null) p.reject(new Error(`cmux error: ${JSON.stringify(msg.error || msg)}`));
         else p.resolve(msg.result);
       }
     });
@@ -156,8 +164,14 @@ export async function rpc<T = any>(method: string, params?: object): Promise<T> 
       pending.delete(id);
       // A timeout means the socket is likely stale/half-open — drop it so the
       // next call reconnects instead of reusing a dead connection. Only destroy
-      // it if it's still the live socket (a reconnect may have replaced it).
-      if (s === sock && !s.destroyed) s.destroy();
+      // it if it's still the live socket (a reconnect may have replaced it). Also
+      // fail the OTHER in-flight requests on this dead socket immediately rather
+      // than letting each wait out its own timeout — `destroy()` does not reliably
+      // emit 'close' in every libuv state, so don't depend on it to fail them.
+      if (s === sock && !s.destroyed) {
+        s.destroy();
+        failAll(new Error('cmux socket torn down (request timeout)'));
+      }
       reject(new Error(`cmux ${method} timed out`));
     }, REQ_TIMEOUT_MS);
     pending.set(id, { resolve, reject, timer });

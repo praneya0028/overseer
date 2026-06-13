@@ -170,12 +170,21 @@ export const useStore = create<State>((set, get) => ({
   },
   sendCommand: (surfaceId, text) => get()._send({ type: 'send', surfaceId, text, confirmed: true }),
   answer: (surfaceId, text) => get()._send({ type: 'answer', surfaceId, text }),
-  interrupt: (surfaceId) => get()._send({ type: 'interrupt', surfaceId }),
+  // interrupt + recallAll are control actions whose effect (Ctrl+C / disarming the
+  // fleet) is surprising if it fires LATER. They must not be silently queued while
+  // offline and then replayed minutes later on reconnect — drop them with a toast.
+  interrupt: (surfaceId) => {
+    if (!get().connected) return get().pushToast('error', 'Offline — interrupt not sent');
+    get()._send({ type: 'interrupt', surfaceId });
+  },
   setAutopilot: (surfaceId, enabled) => get()._send({ type: 'setAutopilot', surfaceId, enabled }),
   setMaster: (enabled) => get()._send({ type: 'setMaster', enabled }),
   setBrainModel: (model) => get()._send({ type: 'setBrainModel', model }),
   setOrders: (surfaceId, text) => get()._send({ type: 'setOrders', surfaceId, text }),
-  recallAll: () => get()._send({ type: 'recallAll' }),
+  recallAll: () => {
+    if (!get().connected) return get().pushToast('error', 'Offline — recall not sent');
+    get()._send({ type: 'recallAll' });
+  },
 
   pushToast: (level, text) => {
     const id = toastSeq++;

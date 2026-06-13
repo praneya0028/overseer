@@ -348,11 +348,14 @@ function deriveCodex(text: string): Derived {
   return { state: 'unknown', model };
 }
 
-export function deriveState(text: string, title: string, agentType = 'claude'): Derived {
+export function deriveState(text: string, title: string, agentType?: string): Derived {
   if (agentType === 'gemini') return deriveGemini(text);
   if (agentType === 'codex') return deriveCodex(text);
   // Only the Claude parser (below) may emit waiting-* states — it's the one TUI
-  // these heuristics were built for. Any OTHER unrecognized kind is watch-only.
+  // these heuristics were built for. Any OTHER kind (incl. a missing/blank one)
+  // is watch-only, so autopilot can never fire into a TUI we haven't reverse-
+  // engineered. NOTE: no 'claude' default — an undefined kind must NOT be parsed
+  // as Claude.
   if (agentType !== 'claude') return deriveGeneric(text);
   const ctxPct = parseCtxPct(text);
   const { model, mode, usage } = parseModelMode(text);
@@ -377,7 +380,13 @@ export function deriveState(text: string, title: string, agentType = 'claude'): 
     return { state: 'waiting-permission', ...extractQuestion(bottom), ctxPct, model, mode, usage };
   }
   const numbered = (bottom.match(/^\s*[│┃|]?\s*(?:❯\s*)?\d+\.\s+\S/gm) || []).length;
-  if (!emptyComposer && numbered >= 2) {
+  // A real interactive menu renders a selection cursor (❯) and/or a box border
+  // around the options; a plain prose numbered list (an agent summarizing "1. did
+  // X / 2. did Y") has neither. Require that corroborating chrome so a finished
+  // agent's numbered recap isn't misread as an answerable menu (which could
+  // mis-fire autopilot). Permission boxes are already handled above (R3/R4).
+  const menuChrome = /❯/.test(bottom) || /[│┃╭╮╰╯]/.test(bottom);
+  if (!emptyComposer && numbered >= 2 && menuChrome) {
     return { state: 'waiting-question', ...extractQuestion(bottom), ctxPct, model, mode, usage };
   }
   // R5 IDLE-BUT-ASKED: the agent finished its turn with a question and is now

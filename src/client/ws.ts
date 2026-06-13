@@ -53,6 +53,10 @@ export function connectWs(): void {
     }
   };
   ws.onclose = () => {
+    // Ignore a stale close from a socket a reconnect already replaced — otherwise
+    // it would null out the live socket (stranding queued sends until the next
+    // reconnect) and flip the UI to "reconnecting" while we're actually connected.
+    if (socket !== ws) return;
     useStore.getState().setConnected(false);
     socket = null;
     const jitter = Math.random() * 250;

@@ -99,7 +99,7 @@ its states differently:
 - **`claude`** — the full machine below (permission boxes, numbered menus, composer).
 - **`gemini`** — `Thinking…`/`esc to cancel` = working; the boxed `Answer Questions`
   menu (with ≥1 parsed option) = `waiting-question`; `Type your message` = idle.
-  Menus are answered by **number hotkey** (the digit selects *and* submits).
+  Menus are answered by **number hotkey** — Overseer sends the digit alone (no Enter).
 - **`codex`** — `• Working`/`esc to interrupt` = working, else idle. Codex
   auto-approves and prints clarifying questions as plain text that returns to an idle
   prompt, so it is **never** classified `waiting-*` (we don't guess at an idle agent).
@@ -114,7 +114,7 @@ The Claude adapter, ordered, first-match-wins:
 | `working` | braille spinner in title, or spinner/`esc to interrupt`/token-meter in the last lines |
 | `error` | error/traceback patterns near the bottom |
 | `waiting-permission` | a boxed `Do you want to…` prompt (no empty composer) |
-| `waiting-question` | a numbered menu (≥2 options), **or** an idle agent whose last line is a question (the common "asked then waiting" case) |
+| `waiting-question` | a numbered menu (≥2 options) **with a selection cursor (`❯`) or box border** (a plain prose numbered list is *not* a menu), **or** an idle agent whose last line is a question (the common "asked then waiting" case) |
 | `done` | a finish marker + idle prompt |
 | `idle` | bare empty `❯` composer or the status footer |
 | `unknown` | nothing matched — rendered as idle in the UI, never autopiloted |
@@ -130,7 +130,7 @@ parsed for free from the status footer.
 
 ## 5. cmux integration — hard-won facts
 
-All verified live against cmux 0.64.x. **These are the load-bearing gotchas:**
+Worked out against cmux 0.64.x. **These are the load-bearing gotchas:**
 
 - **Talk to the socket, NOT the CLI.** Each `cmux` CLI call spawns a 13 MB process
   and opens a fresh socket connection; under continuous polling the socket trips
@@ -151,7 +151,8 @@ All verified live against cmux 0.64.x. **These are the load-bearing gotchas:**
 - **Socket path is auto-detected**, never hardcoded: `CMUX_SOCKET_PATH` → `cmux-<uid>.sock`
   → newest `cmux-*.sock`, re-resolved on every reconnect (survives a cmux restart).
 - **Send** = `surface.send_text {surface_id, text}` (Claude `\n` submits); menus use
-  `surface.send_key` (digit, or digit+Enter). Per-vendor — Gemini's digit auto-submits.
+  `surface.send_key` (digit, or digit+Enter). Per-vendor — for Gemini's menu Overseer
+  sends the digit alone (no trailing Enter).
 - **`read_text` returns only the ~60-line live viewport** — no scrollback (the
   `--scrollback` flag is a no-op in this build). Overseer builds its own deep
   scrollback with the **alignment engine** (`ingest`, poller.ts): each read is
@@ -261,6 +262,7 @@ src/client/
                             #   CommandBar, RightRail, CommandPalette, Avatar, Logo, Toaster
   lib/                      # identity (callsign/hue), state-ui (colors/format), state-color
 bin/overseer.sh             # launcher: ensure daemon + open/focus console; `stop|status`
+bin/overseerctl.sh          # alt control script: start|stop|restart|status|logs
 docs/ARCHITECTURE.md       # this file
 ```
 

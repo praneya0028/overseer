@@ -23,19 +23,43 @@ export const BRAIN_MODELS: { id: string; label: string }[] = [
   { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
   { id: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5' },
 ];
+// A model id is passed straight to `claude -p --model <id>` as an execFile
+// ARGV element. execFile uses no shell (no command injection), but a value that
+// starts with "-" could be reparsed by the CLI as a flag (argument injection),
+// and this id is settable at runtime over the WS surface. So validate: non-empty,
+// bounded, no whitespace/control chars, and never leading "-". The charset is
+// generous enough for real ids (dated snapshots, "[1m]" suffixes, provider/model).
+const MODEL_ID_RE = /^[\w.:@/[\]-]+$/;
+export function isValidModelId(model: unknown): model is string {
+  return (
+    typeof model === 'string' &&
+    model.length > 0 &&
+    model.length <= 128 &&
+    !model.startsWith('-') &&
+    !/\s/.test(model) &&
+    MODEL_ID_RE.test(model)
+  );
+}
+
 let currentBrainModel = 'claude-opus-4-8';
 if (process.env.OVERSEER_BRAIN_MODEL) {
-  currentBrainModel = process.env.OVERSEER_BRAIN_MODEL;
-  if (!BRAIN_MODELS.some((m) => m.id === currentBrainModel)) {
-    BRAIN_MODELS.push({ id: currentBrainModel, label: currentBrainModel }); // custom → show in picker
+  if (isValidModelId(process.env.OVERSEER_BRAIN_MODEL)) {
+    currentBrainModel = process.env.OVERSEER_BRAIN_MODEL;
+    if (!BRAIN_MODELS.some((m) => m.id === currentBrainModel)) {
+      BRAIN_MODELS.push({ id: currentBrainModel, label: currentBrainModel }); // custom → show in picker
+    }
+  } else {
+    // eslint-disable-next-line no-console
+    console.error(`overseer: ignoring invalid OVERSEER_BRAIN_MODEL — using ${currentBrainModel}`);
   }
 }
 export function getBrainModel(): string {
   return currentBrainModel;
 }
-/** Set the brain model. Accepts any non-empty id so custom models work. */
+/** Set the brain model. Accepts any valid custom id; rejects anything that could
+ *  be reparsed as a CLI flag or isn't a plausible model id. */
 export function setBrainModel(model: string): boolean {
-  if (!model || typeof model !== 'string') return false;
+  if (!isValidModelId(model)) return false;
   currentBrainModel = model;
   return true;
 }
@@ -60,20 +84,37 @@ export interface BrainResult {
   timedOut?: boolean; // distinguish a timeout from a generic exec failure
 }
 
+// The agent's on-screen text, its menu labels, the session transcript, and even
+// precedent answers are all UNTRUSTED (a hostile/compromised agent controls what
+// it prints). They are interpolated into `"""`-fenced blocks below, so neutralize
+// any literal triple-quote in them — otherwise an agent could close the fence and
+// inject top-level prompt instructions (e.g. a forged "STANDING ORDERS" block
+// telling the brain to always answer yes). The server-side risk gates + deny-list
+// are the real backstop, but the prompt itself must not be hijackable.
+function fence(s: string): string {
+  return s.replace(/"{3,}/g, (m) => '”'.repeat(m.length));
+}
+// For fields interpolated OUTSIDE a """ fence (option labels, precedent Q/A):
+// also collapse newlines, so injected text can't forge a fake top-level section
+// header (e.g. a "STANDING ORDERS:" line) — those fields are single-line anyway.
+function inline(s: string): string {
+  return fence(s).replace(/\s+/g, ' ').trim();
+}
+
 function buildPrompt(input: BrainInput): string {
   const optionsBlock = input.options.length
-    ? input.options.map((o) => `  ${o.index}. ${o.label}`).join('\n')
+    ? input.options.map((o) => `  ${o.index}. ${inline(o.label)}`).join('\n')
     : '(free-form text answer expected; no menu)';
   const ordersBlock = input.orders?.trim()
-    ? `\nSTANDING ORDERS from the human — these override every default below. Follow them exactly:\n"""\n${input.orders.trim()}\n"""\n`
+    ? `\nSTANDING ORDERS from the human — these override every default below. Follow them exactly:\n"""\n${fence(input.orders.trim())}\n"""\n`
     : '';
   const precedentBlock = input.precedents?.length
     ? `\nPRECEDENT — how questions like this were answered before (match the human's style and choices):\n${input.precedents
-        .map((p) => `- Q: ${p.question}\n  A (${p.byHuman ? 'by the HUMAN' : 'sent by you, accepted'}): ${p.answer}`)
+        .map((p) => `- Q: ${inline(p.question)}\n  A (${p.byHuman ? 'by the HUMAN' : 'sent by you, accepted'}): ${inline(p.answer)}`)
         .join('\n')}\n`
     : '';
   const historyBlock = input.transcriptTail?.trim()
-    ? `\nSession history (what the agent has been doing — infer the task and the human's intent from this):\n"""\n${input.transcriptTail.trim()}\n"""\n`
+    ? `\nSession history (what the agent has been doing — infer the task and the human's intent from this):\n"""\n${fence(input.transcriptTail.trim())}\n"""\n`
     : '';
   return `You are Overseer, the human's trusted delegate supervising an autonomous coding agent (${input.agentLabel || 'a coding agent'}). The agent has PAUSED waiting for a human answer. Your job is to keep the fleet MOVING: answer exactly as the human would, so they are interrupted only when truly necessary. You CANNOT run tools — you only choose a response.
 ${ordersBlock}${precedentBlock}
@@ -93,14 +134,14 @@ Agent working directory: ${input.cwd || '(unknown)'}
 ${historyBlock}
 Agent's detected question:
 """
-${input.question}
+${fence(input.question)}
 """
 Options presented (index: label):
 ${optionsBlock}
 
 Current screen (last lines — the question and any prompt box are here):
 """
-${input.viewportTail}
+${fence(input.viewportTail)}
 """
 
 Respond with ONLY a JSON object (no prose, no markdown fences) of the form:
@@ -116,16 +157,20 @@ function extractJson(result: string): any {
   return JSON.parse(m[0]);
 }
 
-function coerceDecision(raw: any): DecisionPayload {
+export function coerceDecision(raw: any): DecisionPayload {
   const actionType = ['menu_choice', 'send_text', 'interrupt', 'defer_to_human'].includes(raw?.actionType)
     ? raw.actionType
     : 'defer_to_human';
   let d: DecisionPayload = {
     actionType,
-    optionIndex: typeof raw?.optionIndex === 'number' ? raw.optionIndex : null,
+    // Number.isFinite (not typeof === 'number'): JSON "1e999" parses to a number
+    // that is Infinity, and Math.min(1, Infinity) === 1 — i.e. a model could
+    // self-assign confidence above every floor with a finite-looking literal.
+    // Reject any non-finite number so it falls to the conservative default.
+    optionIndex: Number.isFinite(raw?.optionIndex) && raw.optionIndex >= 0 ? Math.trunc(raw.optionIndex) : null,
     payload: typeof raw?.payload === 'string' ? raw.payload : null,
     reasoning: typeof raw?.reasoning === 'string' ? raw.reasoning.slice(0, 400) : '',
-    confidence: typeof raw?.confidence === 'number' ? Math.max(0, Math.min(1, raw.confidence)) : 0,
+    confidence: Number.isFinite(raw?.confidence) ? Math.max(0, Math.min(1, raw.confidence)) : 0,
     // Missing risk fields default CONSERVATIVE (medium / irreversible) — an
     // older or sloppy model output must fall toward deferral, never toward action.
     risk: raw?.risk === 'low' || raw?.risk === 'medium' || raw?.risk === 'high' ? raw.risk : 'medium',

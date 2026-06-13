@@ -103,7 +103,11 @@ export function ingest(m: { transcript: string[]; liveView: string[] }, text: st
       let len = 0;
       while (len < span && P[s + len] === V[len]) len++;
       const full = len === span && span >= 1;
-      if (len > bestLen || (len === bestLen && full && !bestFull)) {
+      // Strictly-greater only, so on ties the SMALLEST s wins — i.e. we commit
+      // the FEWEST scrolled-off lines. (A run of identical lines like `}`/`}`
+      // otherwise lets a larger-s "full" alignment win and commit a spurious
+      // duplicate even though only the bottom line mutated.)
+      if (len > bestLen) {
         bestLen = len;
         bestS = s;
         bestFull = full;
@@ -112,18 +116,35 @@ export function ingest(m: { transcript: string[]; liveView: string[] }, text: st
     }
     const aligned = bestLen >= 2 || (bestFull && bestLen >= 1);
     if (!aligned && V.length >= 2) {
-      // Unaligned, and the NEW view matches a recently committed block: the
-      // screen RETURNED to history — a full-screen overlay (help / transcript
-      // view) just closed and restored what was underneath. Un-commit: truncate
-      // the transcript back to the match and let those lines be live again
-      // (this also drops the overlay's own chrome frame, which is the right
-      // call — it was never conversation). Without this, the restored content
-      // re-commits when it next scrolls off → duplicated history.
-      const at = lastBlockIndex(m.transcript, V, 80);
+      // The new view shows content we ALREADY have rather than new output —
+      // either a full-screen overlay (help / transcript view) just closed and
+      // restored what was underneath, OR the user scrolled the pager back UP.
+      // Find V as a contiguous block of the full display (committed + live).
+      const full = m.transcript.length ? [...m.transcript, ...m.liveView] : m.liveView;
+      const at = lastBlockIndex(full, V, V.length + 120);
       if (at >= 0) {
-        m.transcript.length = at;
-        m.liveView = V;
-        return;
+        if (at + V.length === m.transcript.length) {
+          // V is the block that sits at the LIVE EDGE of committed history (its
+          // last line is the last committed line) → an overlay closed and
+          // restored exactly what was underneath → un-commit back to the match so
+          // it isn't re-committed when it next scrolls off (this also drops the
+          // overlay's own chrome). The adjacency check is essential: matching ANY
+          // buried block (at + V.length < transcript.length) would truncate away
+          // — and permanently lose — every line committed after it.
+          m.transcript.length = at;
+          m.liveView = V;
+          return;
+        }
+        if (at + V.length > m.transcript.length) {
+          // V spans into / sits within the LIVE region → backward scroll showing
+          // content still on screen. Leave the transcript AND the real live tail
+          // untouched — committing P or adopting V here would duplicate history
+          // the moment the user scrolls back down.
+          return;
+        }
+        // else: V matches only a BURIED historical block (not the live edge, not
+        // the live region). This is a genuine redraw that happens to coincide with
+        // old content — fall through and commit P as history; never truncate.
       }
     }
     // Aligned: commit the lines that scrolled off the top. Unaligned (redraw /
@@ -308,7 +329,11 @@ export class Fleet extends EventEmitter implements IFleet {
     // detects an agent AND names its kind — agent-agnostic, not Claude-only.
     const agentByPid = new Map<number, AgentKind>();
     for (const ca of top.coding_agents || []) {
-      const kind: AgentKind = { id: ca.id, label: ca.display_name || ca.id };
+      // Never let a missing/blank cmux id become a falsy agent kind — a falsy
+      // kind would fall through to the Claude state parser (which CAN emit
+      // waiting-*), letting autopilot fire on an unverified TUI. Default to the
+      // watch-only 'generic' adapter instead.
+      const kind: AgentKind = { id: ca.id || 'generic', label: ca.display_name || ca.id || 'agent' };
       for (const p of ca.resources?.pids || []) agentByPid.set(p, kind);
     }
 

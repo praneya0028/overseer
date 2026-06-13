@@ -16,13 +16,28 @@ const MAX_LEN = 2000; // a directive is a paragraph, not a novel — bound it
 let filePath = '';
 let state: OrdersState = { global: '', perAgent: {} };
 
+// A per-agent key is a cmux surface id. Reject anything that isn't a plain
+// non-empty string, and never let the special object keys through (defense in
+// depth: assigning a string to obj.__proto__ is a no-op in V8, but we don't want
+// these keys in the persisted map or the brain prompt regardless).
+const FORBIDDEN_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+function validSurfaceKey(id: unknown): id is string {
+  return typeof id === 'string' && id.length > 0 && id.length <= 256 && !FORBIDDEN_KEYS.has(id);
+}
+
 export function initOrders(path: string): void {
   filePath = path;
   try {
     const raw = JSON.parse(readFileSync(path, 'utf8'));
+    const perAgent: Record<string, string> = {};
+    if (raw?.perAgent && typeof raw.perAgent === 'object') {
+      for (const [k, v] of Object.entries(raw.perAgent)) {
+        if (validSurfaceKey(k) && typeof v === 'string') perAgent[k] = v.slice(0, MAX_LEN);
+      }
+    }
     state = {
       global: typeof raw?.global === 'string' ? raw.global.slice(0, MAX_LEN) : '',
-      perAgent: raw?.perAgent && typeof raw.perAgent === 'object' ? raw.perAgent : {},
+      perAgent,
     };
   } catch {
     /* first run / unreadable → defaults */
@@ -35,9 +50,13 @@ export function getOrders(): OrdersState {
 
 export function setOrders(surfaceId: string | null, text: string): void {
   const t = String(text || '').slice(0, MAX_LEN);
-  if (surfaceId === null) state.global = t;
-  else if (t) state.perAgent[surfaceId] = t;
-  else delete state.perAgent[surfaceId]; // empty per-agent directive = remove
+  if (surfaceId === null) {
+    state.global = t;
+  } else {
+    if (!validSurfaceKey(surfaceId)) return; // ignore bogus / dangerous keys
+    if (t) state.perAgent[surfaceId] = t;
+    else delete state.perAgent[surfaceId]; // empty per-agent directive = remove
+  }
   persist();
 }
 
@@ -57,8 +76,11 @@ export function pruneOrders(liveIds: Set<string>): void {
 export function ordersFor(surfaceId: string): string {
   const parts = [];
   if (state.global.trim()) parts.push(state.global.trim());
+  // typeof guard: if surfaceId happens to name an inherited prototype member
+  // (e.g. "toString"), bracket access returns a function — `.trim()` on it would
+  // throw inside onWaiting. Only treat an own string value as orders text.
   const per = state.perAgent[surfaceId];
-  if (per?.trim()) parts.push(per.trim());
+  if (typeof per === 'string' && per.trim()) parts.push(per.trim());
   return parts.join('\n');
 }
 
